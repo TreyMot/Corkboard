@@ -82,7 +82,9 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     // One origin, so sign-in sessions and reset links always match.
     const url = new URL(request.url);
-    if (url.hostname === "www.corkboard.wine") {
+    const onDomain = url.hostname.endsWith("corkboard.wine");
+    if (onDomain && (url.hostname !== "corkboard.wine" || url.protocol === "http:")) {
+      url.protocol = "https:";
       url.hostname = "corkboard.wine";
       return Response.redirect(url.toString(), 301);
     }
