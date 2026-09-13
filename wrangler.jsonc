@@ -2,4 +2,9 @@
 {
   "name": "corkboard",
   "observability": { "enabled": true },
+  "routes": [
+    { "pattern": "corkboard.wine", "custom_domain": true },
+    // Redirected to corkboard.wine in src/server.ts.
+    { "pattern": "www.corkboard.wine", "custom_domain": true },
+  ],
 }

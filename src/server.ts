@@ -80,6 +80,12 @@ function withSecurityHeaders(response: Response): Response {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    // One origin, so sign-in sessions and reset links always match.
+    const url = new URL(request.url);
+    if (url.hostname === "www.corkboard.wine") {
+      url.hostname = "corkboard.wine";
+      return Response.redirect(url.toString(), 301);
+    }
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
