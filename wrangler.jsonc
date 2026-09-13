@@ -1,0 +1,5 @@
+// Nitro merges this into the wrangler.json it generates in .output/server at build time.
+{
+  "name": "corkboard",
+  "observability": { "enabled": true },
+}
