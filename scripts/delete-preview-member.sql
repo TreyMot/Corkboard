@@ -1,0 +1,12 @@
+-- Removes the dev-only preview member (src/lib/demo.functions.ts) and everything it owns:
+-- profile, ratings, rating_private, wishlist items and entry_photos rows all cascade.
+-- Wines it added stay (members share wines); remove those by hand if they were only tests.
+--
+-- Storage files don't cascade and SQL can't delete them, so do those first. List them:
+--   supabase db query --linked "select 'ss:///'||bucket_id||'/'||name as file from storage.objects o join auth.users u on u.id = o.owner where u.email = 'preview@rim.local'"
+-- then pass every file it prints to:
+--   supabase storage rm --linked --experimental <file> <file> ...
+--
+-- Then run this file from the repo root:
+--   supabase db query --linked -f scripts/delete-preview-member.sql
+delete from auth.users where email = 'preview@rim.local';

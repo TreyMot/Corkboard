@@ -1,0 +1,380 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Corkboard: a private wine journal. Locked in DESIGN.md.
+ * Cellar-dark ground, cream label plates, straw gold accent.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  --font-sans: Archivo, ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-paper: var(--paper);
+  --color-paper-foreground: var(--paper-foreground);
+  --color-gold: var(--gold);
+  --color-gold-bright: var(--gold-bright);
+  --color-ink: var(--ink);
+  --color-quiet: var(--quiet);
+  --color-dim: var(--dim);
+  --color-eyebrow: var(--eyebrow);
+
+  /* Label plate — cream printed stock used for tiles without a photo. */
+  --color-plate: var(--plate);
+  --color-plate-rule: var(--plate-rule);
+  --color-plate-foreground: var(--plate-foreground);
+  --color-plate-muted: var(--plate-muted);
+  --color-plate-caps: var(--plate-caps);
+
+  /* Wine colour ramp — data marks only, never backgrounds or theme colour. */
+  --color-wine-straw: #e3ce8b;
+  --color-wine-gold: #d8a93f;
+  --color-wine-onion: #d99a7a;
+  --color-wine-violet: #7a3b6e;
+  --color-wine-garnet: #8e1f2c;
+  --color-wine-tawny: #8a4b22;
+
+  --color-sidebar: var(--card);
+  --color-sidebar-foreground: var(--foreground);
+  --color-sidebar-primary: var(--primary);
+  --color-sidebar-primary-foreground: var(--primary-foreground);
+  --color-sidebar-accent: var(--accent);
+  --color-sidebar-accent-foreground: var(--accent-foreground);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--ring);
+}
+
+:root {
+  --radius: 3px;
+  --background: #14100d;
+  --foreground: #efe6d2;
+  --ink: #e8dfcb;
+  --card: #1b1612;
+  --card-foreground: #e8dfcb;
+  --popover: #1b1612;
+  --popover-foreground: #e8dfcb;
+  --primary: #c9a961;
+  --primary-foreground: #14100d;
+  --secondary: #1b1612;
+  --secondary-foreground: #e8dfcb;
+  --muted: #1b1612;
+  --muted-foreground: #9a9086;
+  --accent: rgba(201, 169, 97, 0.14);
+  --accent-foreground: #efe6d2;
+  --destructive: #e08b84;
+  --destructive-foreground: #14100d;
+  --border: rgba(233, 222, 200, 0.14);
+  --input: rgba(233, 222, 200, 0.39); /* control boundaries: 3:1 on ground and surface */
+  --ring: #c9a961;
+  --paper: #ede3ce;
+  --paper-foreground: #241c13;
+  --gold: #c9a961;
+  --gold-bright: #e3ce8b;
+  --eyebrow: #988f84; /* 4.95:1 at worst on the textured ground */
+  --quiet: #918a7f; /* 4.61:1 at worst on the textured ground */
+  --dim: rgba(233, 222, 200, 0.39); /* empty stars: 3:1 */
+  --plate: #ede3ce;
+  --plate-rule: rgba(36, 28, 19, 0.22);
+  --plate-foreground: #241c13;
+  --plate-muted: #4b3f2f;
+  --plate-caps: #6a5b46;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.65;
+    overflow-x: hidden;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font-family: inherit;
+  }
+
+  /* One focus treatment everywhere: a gold outline, never a glow. */
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+
+  ::selection {
+    background: rgba(201, 169, 97, 0.28);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+/* Small letterspaced caps: labels, tabs, buttons. */
+@utility caps {
+  font-size: 9.5px;
+  line-height: 1.3;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-eyebrow);
+}
+
+/* The only button: a 1px gold outline on the ground, never a fill. */
+@utility btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-gold);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+  &:hover {
+    background: rgba(201, 169, 97, 0.12);
+  }
+  &:active {
+    background: rgba(201, 169, 97, 0.2);
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+/* Secondary action: hairline outline, quiet text. */
+@utility btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(233, 222, 200, 0.2);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 120ms ease-out;
+  &:hover {
+    border-color: var(--color-gold);
+  }
+}
+
+/* Text field on the surface. */
+@utility field {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  background: var(--color-card);
+  border: 1px solid var(--color-input);
+  border-radius: var(--radius);
+  padding: 11px 13px;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  transition: border-color 140ms ease-out;
+  &:hover {
+    border-color: rgba(201, 169, 97, 0.4);
+  }
+  &:focus {
+    border-color: var(--color-gold);
+    outline: none;
+  }
+}
+
+/* Selectable chip: filters, colours, formats. `data-on` marks the chosen one. */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--color-input);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out,
+    color 120ms ease-out;
+  &:hover {
+    border-color: rgba(201, 169, 97, 0.6);
+  }
+  &[data-on="true"] {
+    background: rgba(201, 169, 97, 0.14);
+    border-color: var(--color-gold);
+    color: var(--color-foreground);
+  }
+}
+
+/* Long-form policy pages. */
+@utility legal {
+  margin-top: 26px;
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--color-ink);
+  & h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 24px;
+    line-height: 1.2;
+    color: var(--color-foreground);
+    margin: 34px 0 10px;
+  }
+  & p {
+    margin: 0 0 14px;
+    max-width: 68ch;
+  }
+  & ul {
+    margin: 0 0 14px;
+    padding-left: 20px;
+    list-style: disc;
+    max-width: 68ch;
+  }
+  & li {
+    margin-bottom: 8px;
+  }
+  & a {
+    color: var(--color-gold);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  & strong {
+    font-weight: 600;
+    color: var(--color-foreground);
+  }
+}
+
+/* First focusable element on signed-in pages; hidden until keyboard focus lands on it. */
+@utility skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 10;
+  padding: 10px 14px;
+  background: var(--color-background);
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius);
+  color: var(--color-gold);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  &:focus {
+    top: 12px;
+  }
+}
+
+/* Back link above a screen. */
+@utility back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 2px;
+  border-bottom: 1px solid rgba(201, 169, 97, 0.4);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+  transition: border-color 140ms ease-out;
+  &:hover {
+    border-color: var(--color-gold);
+  }
+}
+
+/* Wine names only: Cormorant Garamond italic 500, never below 18px. */
+@utility wine-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+@utility hairline {
+  border-bottom: 1px solid var(--color-border);
+}
+
+@utility tap {
+  min-height: 44px;
+}
+
+/* Screen heading — Cormorant roman, set large. */
+@utility screen-heading {
+  font-family: var(--font-display);
+  font-style: normal;
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1.06;
+  color: var(--color-foreground);
+}
+
+/* The line of context that sits above a screen heading. */
+@utility eyebrow {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-eyebrow);
+}

@@ -1,0 +1,33 @@
+<!-- Supabase "Reset password" email. Paste into Authentication > Emails > Reset password.
+     Subject: Reset your Corkboard password -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#14100D" style="background:#14100D;">
+  <tr>
+    <td align="center" style="padding:40px 20px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+        <tr>
+          <td style="font-family:Georgia,'Times New Roman',serif;font-size:26px;color:#C9A961;padding-bottom:28px;">Corkboard</td>
+        </tr>
+        <tr>
+          <td style="font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;color:#EFE6D2;padding-bottom:14px;">Reset your password</td>
+        </tr>
+        <tr>
+          <td style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#E8DFCB;padding-bottom:24px;">
+            Someone asked to reset the Corkboard password for {{ .Email }}. If that was you, choose a new one here. The link works once.
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-bottom:28px;">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 18px;border:1px solid #C9A961;border-radius:3px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;color:#C9A961;text-decoration:none;">Choose a new password</a>
+          </td>
+        </tr>
+        <tr>
+          <td style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.6;color:#918A7F;">
+            If you did not ask for this, ignore this email and your password stays the same.<br><br>
+            Button not working? Copy this address into your browser:<br>
+            <a href="{{ .ConfirmationURL }}" style="color:#918A7F;word-break:break-all;">{{ .ConfirmationURL }}</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

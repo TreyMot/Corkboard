@@ -1,0 +1,3 @@
+# Private, invite-only journal: nothing here is meant for search results.
+User-agent: *
+Disallow: /
