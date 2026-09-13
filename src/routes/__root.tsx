@@ -117,7 +117,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       // Self-hosted (OFL, via Fontsource): no request to Google's servers.
       ...FONT_CSS.map((href) => ({ rel: "stylesheet", href })),
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
     ],
   }),
 
