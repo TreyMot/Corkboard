@@ -280,31 +280,34 @@ export type Database = {
         Row: {
           bottling_id: string
           created_at: string
-          drunk_on: string
+          drunk_on: string | null
           id: string
           note: string | null
           place: string | null
-          stars: number
+          stars: number | null
+          tasting_notes: string[]
           user_id: string
         }
         Insert: {
           bottling_id: string
           created_at?: string
-          drunk_on?: string
+          drunk_on?: string | null
           id?: string
           note?: string | null
           place?: string | null
-          stars: number
+          stars?: number | null
+          tasting_notes?: string[]
           user_id: string
         }
         Update: {
           bottling_id?: string
           created_at?: string
-          drunk_on?: string
+          drunk_on?: string | null
           id?: string
           note?: string | null
           place?: string | null
-          stars?: number
+          stars?: number | null
+          tasting_notes?: string[]
           user_id?: string
         }
         Relationships: [

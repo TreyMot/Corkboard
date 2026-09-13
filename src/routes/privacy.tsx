@@ -17,7 +17,7 @@ export const Route = createFileRoute("/privacy")({
 
 function PrivacyPage() {
   return (
-    <LegalPage title="Privacy" updated="September 12, 2026">
+    <LegalPage title="Privacy" updated="September 13, 2026">
       <p>
         Corkboard is a private, invite-only wine journal run by Trey Motsenbocker for a small circle
         of family and friends. This page explains what the journal keeps about you, who can see it,
@@ -34,7 +34,7 @@ function PrivacyPage() {
         </li>
         <li>
           <strong>Your journal:</strong> the wines you log, their vintages and bottle sizes, your
-          ratings and notes, where you drank them, and when.
+          ratings, tasting notes and notes, where you drank them, and when.
         </li>
         <li>
           <strong>Private details:</strong> your optional 100-point scores, how many bottles you
@@ -62,8 +62,9 @@ function PrivacyPage() {
       <h2>Who can see it</h2>
       <ul>
         <li>
-          <strong>Other members</strong> see your name, profile photo, ratings, notes, where you
-          drank a wine, dates, and the photos on bottles you have logged.
+          <strong>Other members</strong> see your name, profile photo, ratings, tasting notes,
+          notes, where you drank a wine, dates, the bottles you have logged (including ones not
+          opened yet), and the photos on them.
         </li>
         <li>
           <strong>Only you</strong> see your 100-point scores, bottles owned, wishlist and wishlist

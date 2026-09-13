@@ -8,8 +8,8 @@ Source of truth: Claude Design project "Corkboard Frontend Design", file `Corkbo
   - 70, ground: cellar-dark `#14100D`, surface `#1B1612`, hairlines `rgba(233,222,200,.14)` (decorative only); control borders and empty stars `rgba(233,222,200,.39)` for 3:1 non-text contrast.
   - 20, text and plates: `#EFE6D2` headings, `#E8DFCB` body, muted `#9A9086` / `#988F84` / `#918A7F` (raised 2026-09-13 so small text clears 4.5:1 even on the textured ground), plate `#EDE3CE` with ink `#241C13`.
   - 10, accent: straw gold `#C9A961` (hover `#E3CE8B`) for strokes, outlines, small marks.
-  - Colour-in-glass ramp, **data marks only** (3px bars and swatches, never fills or theme colour): straw `#E3CE8B`, gold `#D8A93F`, onion `#D99A7A`, violet `#7A3B6E`, garnet `#8E1F2C`, tawny `#8A4B22`.
-- **Type:** Cormorant Garamond for wine names, headings and figures (label typography); Archivo for UI text and the small letterspaced caps (label small print). Both are OFL via Google Fonts, no paid tier.
+  - Colour-in-glass ramp, **data marks only** (3px bars and swatches, never fills or theme colour): straw `#E3CE8B`, gold `#D8A93F`, onion `#D99A7A`, violet `#7A3B6E`, garnet `#8E1F2C`, tawny `#8A4B22`. Since 2026-09-13 the bar follows the wine's style (red garnet, white and sparkling straw, rosé onion, orange gold, fortified tawny); members no longer pick a colour, they pick tasting notes. No colour key on the home page.
+- **Type:** Cormorant Garamond for wine names, headings and figures (label typography); Archivo for UI text and the small letterspaced caps (label small print). Both are OFL, self-hosted through Fontsource (no requests to Google), no paid tier.
 - **Radius:** 3px on buttons, inputs, chips and the header badge; 0 on tiles, plates and photographs. Nothing else.
 - **Motion** (all under `prefers-reduced-motion: reduce` switch to none):
   - colour, border and background transitions on hover and selection, 110 to 140ms ease-out

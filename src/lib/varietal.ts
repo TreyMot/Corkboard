@@ -137,17 +137,66 @@ export function normalizeVarietal(input: string | null | undefined): Varietal | 
   return CANONICAL_BY_FOLD.get(key) ?? ALIASES[key] ?? null;
 }
 
-/** Find a varietal mentioned anywhere inside a free-text string (e.g. a cuvée). */
-export function detectVarietal(text: string | null | undefined): Varietal | null {
+const BLENDS: Varietal[] = ["Red Blend", "White Blend"];
+const WHITE_GRAPES = new Set<Varietal>([
+  "Chardonnay",
+  "Sauvignon Blanc",
+  "Riesling",
+  "Pinot Gris",
+  "Pinot Blanc",
+  "Chenin Blanc",
+  "Viognier",
+  "Gewürztraminer",
+  "Albariño",
+  "Grüner Veltliner",
+  "Sémillon",
+  "Muscat",
+  "Verdejo",
+  "Vermentino",
+  "Trebbiano",
+  "Glera",
+]);
+
+/** The picker's order: blends first, then grapes A to Z. */
+export const VARIETAL_GROUPS: { label: string; options: Varietal[] }[] = [
+  { label: "Blends", options: BLENDS },
+  {
+    label: "Grapes",
+    options: VARIETALS.filter((v) => !BLENDS.includes(v)).sort((a, b) => a.localeCompare(b)),
+  },
+];
+
+// Longest first, so "cabernet franc" claims its words before "cabernet" can.
+const DETECT_KEYS: [string, Varietal][] = [
+  ...CANONICAL_BY_FOLD,
+  ...Object.entries(ALIASES).filter(([key]) => key.length >= 4),
+].sort((a, b) => b[0].length - a[0].length);
+
+/**
+ * Find the varietal in free text (a cuvée, or a label's "85% Malbec, 10% Cabernet Sauvignon").
+ * Two or more grapes, or the word "blend", make it a Red or White Blend: white when every
+ * grape named is white, or by the wine's style when no grape is named.
+ */
+export function detectVarietal(
+  text: string | null | undefined,
+  style?: string | null,
+): Varietal | null {
   if (!text) return null;
-  const haystack = ` ${fold(text)} `;
-  const candidates: { value: Varietal; length: number }[] = [];
-  for (const [key, value] of CANONICAL_BY_FOLD) {
-    if (haystack.includes(` ${key} `)) candidates.push({ value, length: key.length });
+  let haystack = ` ${fold(text)} `;
+  const found = new Set<Varietal>();
+  for (const [key, value] of DETECT_KEYS) {
+    const needle = ` ${key} `;
+    if (!haystack.includes(needle)) continue;
+    found.add(value);
+    haystack = haystack.split(needle).join(" ");
   }
-  for (const [key, value] of Object.entries(ALIASES)) {
-    if (key.length >= 4 && haystack.includes(` ${key} `)) candidates.push({ value, length: key.length });
+  const named = BLENDS.find((b) => found.has(b));
+  if (named) return named;
+  const grapes = [...found].filter((v) => v !== "Rosé");
+  const saysBlend = / blend /.test(haystack);
+  if (grapes.length >= 2 || (saysBlend && (grapes.length || style))) {
+    const white = grapes.length ? grapes.every((g) => WHITE_GRAPES.has(g)) : style === "white";
+    return white ? "White Blend" : "Red Blend";
   }
-  candidates.sort((a, b) => b.length - a.length);
-  return candidates[0]?.value ?? null;
+  return grapes[0] ?? (found.has("Rosé") ? "Rosé" : null);
 }

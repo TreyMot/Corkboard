@@ -16,16 +16,17 @@ import {
   getBottlesOwned,
   getRatingById,
   getWishlistItem,
-  glassOf,
   isOnWishlist,
   memberLabel,
   removeWishlistItem,
   setBottlesOwned,
+  todayLocal,
   updateMyRating,
   type FeedRow,
   type WishlistEntry,
 } from "@/lib/rim";
 import type { EntryType } from "@/lib/photos";
+import { TastingNotes } from "@/components/TastingNotes";
 
 export const Route = createFileRoute("/_authenticated/entry/$entryType/$entryId")({
   head: () => ({
@@ -103,7 +104,6 @@ function EntryPage() {
 
   const wine = data.wine;
   const vintage = rating ? rating.bottling.vintage : undefined;
-  const glass = glassOf(wine);
   const note = rating ? rating.note : (data as WishlistEntry).note;
   const refresh = () =>
     Promise.all([
@@ -117,7 +117,20 @@ function EntryPage() {
 
   async function rate(stars: number) {
     try {
-      await updateMyRating(entryId, { stars });
+      // Rating an unopened bottle opens it: it takes today's date, changeable below.
+      await updateMyRating(entryId, {
+        stars,
+        ...(rating?.drunk_on ? {} : { drunk_on: todayLocal() }),
+      });
+      await refresh();
+    } catch {
+      failed();
+    }
+  }
+
+  async function saveTasting(tasting_notes: string[]) {
+    try {
+      await updateMyRating(entryId, { tasting_notes });
       await refresh();
     } catch {
       failed();
@@ -181,12 +194,13 @@ function EntryPage() {
     },
     { label: "Varietal", value: wine.varietal_raw ?? wine.varietal ?? "Not recorded" },
     { label: "Style", value: colourInfo(wine.colour).label },
-    { label: "Color", value: glass.label, swatch: glass.hex },
     ...(rating
       ? [
           {
             label: "Poured",
-            value: `${mine ? "By you" : `By ${memberLabel(rating.profile.display_name)}`}, ${formatDate(rating.drunk_on)}`,
+            value: rating.drunk_on
+              ? `${mine ? "By you" : `By ${memberLabel(rating.profile.display_name)}`}, ${formatDate(rating.drunk_on)}`
+              : `Not opened yet, in ${mine ? "your" : `${memberLabel(rating.profile.display_name)}'s`} cellar`,
           },
         ]
       : []),
@@ -276,7 +290,18 @@ function EntryPage() {
                     {mine ? "Your rating" : `${memberLabel(rating.profile.display_name)}'s rating`}
                   </div>
                   {mine ? (
-                    <StarPicker value={rating.stars} onChange={(v) => void rate(v)} />
+                    <>
+                      <StarPicker value={rating.stars} onChange={(v) => void rate(v)} />
+                      {rating.stars == null ? (
+                        <p className="m-0 text-quiet" style={{ fontSize: 12 }}>
+                          Not opened yet. Rate it when you do.
+                        </p>
+                      ) : null}
+                    </>
+                  ) : rating.stars == null ? (
+                    <p className="m-0 text-muted-foreground" style={{ fontSize: 14 }}>
+                      Not opened yet
+                    </p>
                   ) : (
                     <div className="flex items-center">
                       <Stars value={rating.stars} size={30} />
@@ -296,7 +321,7 @@ function EntryPage() {
                   className="btn-gold"
                   style={{ background: "rgba(201,169,97,.12)" }}
                 >
-                  I have had this now
+                  Move to my cellar
                 </Link>
               ) : null}
 
@@ -312,6 +337,20 @@ function EntryPage() {
                 {wish.data ? "On the wishlist" : "Add to wishlist"}
               </button>
             </div>
+
+            {rating && (mine ? rating.stars != null : rating.tasting_notes.length > 0) ? (
+              <div className="flex flex-col" style={{ gap: 10, paddingTop: 20 }}>
+                <div className="caps" id="tasting-label">
+                  {mine ? "Your tasting notes" : "Tasting notes"}
+                </div>
+                <TastingNotes
+                  style={wine.colour}
+                  value={rating.tasting_notes}
+                  labelId="tasting-label"
+                  {...(mine ? { onChange: (notes: string[]) => void saveTasting(notes) } : {})}
+                />
+              </div>
+            ) : null}
 
             {rating && (mine || rating.place) ? (
               <>
@@ -436,7 +475,7 @@ function EntryPage() {
                     Edit bottle
                   </button>
                   <span className="text-quiet" style={{ fontSize: 11, lineHeight: 1.6 }}>
-                    Correct the vineyard, location, varietal or color in glass.
+                    Correct the vineyard, location, varietal or style.
                   </span>
                 </>
               ) : null}

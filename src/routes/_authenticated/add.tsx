@@ -4,12 +4,20 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { AppShell, BackToGrid } from "@/components/AppShell";
-import { FieldLabel as Label, StyleAndGlass, VarietalSelect } from "@/components/EditWine";
+import { FieldLabel as Label, StylePicker, VarietalSelect } from "@/components/EditWine";
 import { StarPicker } from "@/components/Stars";
 import { ColourMark, InlineError, SkeletonRows, WineName } from "@/components/WineBits";
 import { wineTitle } from "@/components/WineTile";
 import { identifyLabel } from "@/lib/label.functions";
-import { centreCrop, DecodeError, decodeFile, labelImageBase64, uploadPhoto } from "@/lib/photos";
+import {
+  centreCrop,
+  DecodeError,
+  decodeFile,
+  labelImageBase64,
+  moveWishlistPhotos,
+  uploadPhoto,
+} from "@/lib/photos";
+import { TastingNotes } from "@/components/TastingNotes";
 import {
   addToWishlist,
   adoptLwinWine,
@@ -31,7 +39,6 @@ import {
   searchProducers,
   todayLocal,
   type Colour,
-  type Glass,
   type Wine,
 } from "@/lib/rim";
 import { detectVarietal, normalizeVarietal } from "@/lib/varietal";
@@ -90,7 +97,6 @@ function AddPage() {
   const [mLocation, setMLocation] = useState("");
   const [mCountry, setMCountry] = useState("");
   const [colour, setColour] = useState<Colour>("red");
-  const [glass, setGlass] = useState<Glass>("garnet");
 
   // --- rating ---------------------------------------------------------------
   const [formatMl, setFormatMl] = useState(750);
@@ -100,6 +106,10 @@ function AddPage() {
   const [wishOnly, setWishOnly] = useState(false);
   const [score, setScore] = useState("");
   const [drunkOn, setDrunkOn] = useState(todayLocal);
+  // Gifts and bottles bought to try go in the cellar unopened: no stars or date until tasted.
+  const [opened, setOpened] = useState(true);
+  const [owned, setOwned] = useState("");
+  const [tasting, setTasting] = useState<string[]>([]);
 
   const [starError, setStarError] = useState(false);
   const [wineError, setWineError] = useState<string | null>(null);
@@ -263,7 +273,6 @@ function AddPage() {
       setMVineyard("");
       setMLocation("");
       setColour(style);
-      setGlass(glassForStyle(style));
       setLabelNote(
         match?.source === "lwin"
           ? `${several}Matched to LWIN ${match.lwin7}. Check the fields before saving.`
@@ -281,7 +290,7 @@ function AddPage() {
   }
 
   /** Attach the label photo to the saved entry. A failed upload never undoes the save. */
-  async function attachShot(type: "rating" | "wishlist", entryId: string) {
+  async function attachShot(type: "rating" | "wishlist", entryId: string, makePrimary = true) {
     if (!labelShot) return;
     try {
       await uploadPhoto({
@@ -291,7 +300,7 @@ function AddPage() {
         bitmap: labelShot,
         crop: centreCrop(labelShot),
         kind: "front",
-        makePrimary: true,
+        makePrimary,
       });
     } catch {
       toast("Saved, but the photo didn't upload. Add it from the bottle page.");
@@ -375,7 +384,7 @@ function AddPage() {
       setSaveError("Choose a vintage. Pick Non-vintage if it doesn't have one.");
       return;
     }
-    if (stars == null) {
+    if (opened && stars == null) {
       setStarError(true);
       return;
     }
@@ -387,7 +396,7 @@ function AddPage() {
       const existing = await getMyRatingFor(user.id, bottling.id);
       if (existing) {
         setBusy(false);
-        toast("You've already rated this bottling.", {
+        toast("You've already logged this bottling.", {
           action: {
             label: "Edit it",
             onClick: () => {
@@ -396,22 +405,27 @@ function AddPage() {
           },
         });
         setSaveError(
-          "You've already rated this vintage and format. Use the toast to update it instead.",
+          "You've already logged this vintage and size. Use the toast to update it instead.",
         );
         return;
       }
 
       const ratingId = await saveRating({
+        ...ratingFields(),
         userId: user.id,
         bottlingId: bottling.id,
-        stars,
-        note: note.trim() || null,
-        place: place.trim() || null,
-        score100: score.trim() ? Number(score) : null,
-        drunkOn,
       });
-      if (params.wishlist) await removeWishlistItem(params.wishlist);
-      await attachShot("rating", ratingId);
+      let moved = 0;
+      if (params.wishlist) {
+        // Carry the wishlist photos across before the wishlist entry (and its photo rows) goes.
+        try {
+          moved = await moveWishlistPhotos(params.wishlist, ratingId);
+          await removeWishlistItem(params.wishlist);
+        } catch {
+          toast("Saved. The wishlist entry stays, with its photos, until you remove it.");
+        }
+      }
+      await attachShot("rating", ratingId, moved === 0);
       await queryClient.invalidateQueries();
       toast("Logged.");
       navigate({
@@ -429,14 +443,16 @@ function AddPage() {
 
   function createManualWine() {
     const normalized =
-      normalizeVarietal(mVarietal) ?? detectVarietal(mVarietal) ?? detectVarietal(mCuvee);
+      normalizeVarietal(mVarietal) ??
+      detectVarietal(mVarietal, colour) ??
+      detectVarietal(mCuvee, colour);
     // Filled from LWIN and the identity left as matched: adopt the verified record.
     if (lwinPick && mProducer.trim() === lwinPick.producer && mCuvee.trim() === lwinPick.cuvee) {
       return adoptLwinWine({
         lwin7: lwinPick.lwin7,
         colour,
         varietal: normalized,
-        glass,
+        glass: glassForStyle(colour),
         vineyard: mVineyard.trim() || null,
         location: mLocation.trim() || null,
       });
@@ -446,7 +462,7 @@ function AddPage() {
       cuvee: mCuvee.trim() || null,
       region: mRegion.trim() || null,
       colour,
-      glass,
+      glass: glassForStyle(colour),
       varietal: normalized,
       varietal_raw: mVarietal.trim() && mVarietal.trim() !== normalized ? mVarietal.trim() : null,
       vineyard: mVineyard.trim() || null,
@@ -455,18 +471,22 @@ function AddPage() {
     });
   }
 
+  /** What the form says about this bottle; an unopened one keeps no stars, date, place or score. */
+  function ratingFields() {
+    return {
+      stars: opened ? stars : null,
+      drunkOn: opened ? drunkOn : null,
+      note: note.trim() || null,
+      place: opened ? place.trim() || null : null,
+      score100: opened && score.trim() ? Number(score) : null,
+      tastingNotes: opened ? tasting : [],
+      bottlesOwned: owned ? Number(owned) : opened ? undefined : 1,
+    };
+  }
+
   async function saveExisting(ratingId: string, bottlingId: string) {
     try {
-      await saveRating({
-        id: ratingId,
-        userId: user.id,
-        bottlingId,
-        stars: stars ?? 0,
-        note: note.trim() || null,
-        place: place.trim() || null,
-        score100: score.trim() ? Number(score) : null,
-        drunkOn,
-      });
+      await saveRating({ ...ratingFields(), id: ratingId, userId: user.id, bottlingId });
       await queryClient.invalidateQueries();
       toast("Logged.");
       navigate({
@@ -547,7 +567,6 @@ function AddPage() {
               location={mLocation}
               country={mCountry}
               colour={colour}
-              glass={glass}
               onProducer={setMProducer}
               onCuvee={setMCuvee}
               onRegion={setMRegion}
@@ -556,7 +575,6 @@ function AddPage() {
               onLocation={setMLocation}
               onCountry={setMCountry}
               onColour={setColour}
-              onGlass={setGlass}
               onBack={() => {
                 setManual(false);
                 setLwinPick(null);
@@ -768,7 +786,7 @@ function AddPage() {
                 }}
               />
             </span>
-            Not tasted yet, put it on the wishlist
+            Don't own it yet, put it on the wishlist
           </button>
         ) : null}
 
@@ -824,16 +842,18 @@ function AddPage() {
                   </select>
                 )}
               </div>
-              <div>
-                <Label htmlFor="drunk_on">Drank on</Label>
-                <input
-                  id="drunk_on"
-                  type="date"
-                  value={drunkOn}
-                  onChange={(e) => setDrunkOn(e.target.value)}
-                  className="field"
-                />
-              </div>
+              {opened ? (
+                <div>
+                  <Label htmlFor="drunk_on">Drank on</Label>
+                  <input
+                    id="drunk_on"
+                    type="date"
+                    value={drunkOn}
+                    onChange={(e) => setDrunkOn(e.target.value)}
+                    className="field"
+                  />
+                </div>
+              ) : null}
             </section>
 
             <section>
@@ -856,22 +876,68 @@ function AddPage() {
             </section>
 
             <section className="border-t border-border" style={{ paddingTop: 20 }}>
-              <Label>Your rating</Label>
-              <StarPicker value={stars} onChange={setStars} invalid={starError} />
-              {starError ? <InlineError>Give it a star rating before saving.</InlineError> : null}
+              <Label>Have you opened it?</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: true, label: "Yes, I've tasted it" },
+                  { value: false, label: "Not yet" },
+                ].map((o) => (
+                  <button
+                    key={o.label}
+                    type="button"
+                    onClick={() => {
+                      setOpened(o.value);
+                      setStarError(false);
+                    }}
+                    className="chip"
+                    style={{ minHeight: 44 }}
+                    data-on={opened === o.value}
+                    aria-pressed={opened === o.value}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              {!opened ? (
+                <p className="m-0 text-quiet" style={{ fontSize: 12, marginTop: 8 }}>
+                  It goes in your cellar now. Rate it from the bottle page when you open it.
+                </p>
+              ) : null}
             </section>
 
-            <section>
-              <Label htmlFor="place">Where you drank it</Label>
-              <input
-                id="place"
-                value={place}
-                onChange={(e) => setPlace(e.target.value)}
-                maxLength={200}
-                placeholder="At the Kesslers, in the garden"
-                className="field"
-              />
-            </section>
+            {opened ? (
+              <>
+                <section>
+                  <Label>Your rating</Label>
+                  <StarPicker value={stars} onChange={setStars} invalid={starError} />
+                  {starError ? (
+                    <InlineError>Give it a star rating, or choose Not yet.</InlineError>
+                  ) : null}
+                </section>
+
+                <section>
+                  <Label id="tasting-label">Tasting notes (optional)</Label>
+                  <TastingNotes
+                    style={wine?.colour ?? colour}
+                    value={tasting}
+                    onChange={setTasting}
+                    labelId="tasting-label"
+                  />
+                </section>
+
+                <section>
+                  <Label htmlFor="place">Where you drank it</Label>
+                  <input
+                    id="place"
+                    value={place}
+                    onChange={(e) => setPlace(e.target.value)}
+                    maxLength={200}
+                    placeholder="At the Kesslers, in the garden"
+                    className="field"
+                  />
+                </section>
+              </>
+            ) : null}
 
             <section>
               <Label htmlFor="note">Note</Label>
@@ -887,16 +953,35 @@ function AddPage() {
             </section>
 
             <section>
-              <Label htmlFor="score">Your 100-point score (private, optional)</Label>
+              <Label htmlFor="owned">Bottles in your cellar (private, optional)</Label>
               <input
-                id="score"
+                id="owned"
                 inputMode="numeric"
-                value={score}
-                onChange={(e) => setScore(e.target.value)}
+                value={owned}
+                onChange={(e) => setOwned(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder={opened ? "0" : "1"}
+                aria-describedby="owned-hint"
                 className="field"
                 style={{ width: 128 }}
               />
+              <p id="owned-hint" className="m-0 text-quiet" style={{ fontSize: 11, marginTop: 6 }}>
+                How many you still have, counting unopened ones. Change it later on the bottle page.
+              </p>
             </section>
+
+            {opened ? (
+              <section>
+                <Label htmlFor="score">Your 100-point score (private, optional)</Label>
+                <input
+                  id="score"
+                  inputMode="numeric"
+                  value={score}
+                  onChange={(e) => setScore(e.target.value)}
+                  className="field"
+                  style={{ width: 128 }}
+                />
+              </section>
+            ) : null}
           </>
         ) : null}
 
@@ -1016,7 +1101,6 @@ function ManualForm(props: {
   location: string;
   country: string;
   colour: Colour;
-  glass: Glass;
   onProducer: (v: string) => void;
   onCuvee: (v: string) => void;
   onRegion: (v: string) => void;
@@ -1025,7 +1109,6 @@ function ManualForm(props: {
   onLocation: (v: string) => void;
   onCountry: (v: string) => void;
   onColour: (v: Colour) => void;
-  onGlass: (v: Glass) => void;
   onBack: () => void;
 }) {
   const text = (
@@ -1075,15 +1158,15 @@ function ManualForm(props: {
         )}
         <div style={{ gridColumn: "1 / -1" }}>
           <Label htmlFor="varietal">Varietal (optional)</Label>
-          <VarietalSelect id="varietal" value={props.varietal} onChange={props.onVarietal} />
+          <VarietalSelect
+            id="varietal"
+            value={props.varietal}
+            style={props.colour}
+            onChange={props.onVarietal}
+          />
         </div>
       </div>
-      <StyleAndGlass
-        colour={props.colour}
-        glass={props.glass}
-        onColour={props.onColour}
-        onGlass={props.onGlass}
-      />
+      <StylePicker colour={props.colour} onColour={props.onColour} />
       <button
         type="button"
         onClick={props.onBack}

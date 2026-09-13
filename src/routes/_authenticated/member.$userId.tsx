@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell, BackToGrid, ErrorNote, ScreenHeading } from "@/components/AppShell";
 import { SkeletonTiles, TileGrid, WineTile } from "@/components/WineTile";
-import { getMemberRatings, getProfile, glassOf, memberLabel } from "@/lib/rim";
+import { colourInfo, getMemberRatings, getProfile, memberLabel } from "@/lib/rim";
 import { getPrimaryThumbUrls } from "@/lib/photos";
 
 export const Route = createFileRoute("/_authenticated/member/$userId")({
@@ -64,8 +64,8 @@ function MemberPage() {
                 key={row.id}
                 wine={row.wine}
                 vintage={row.bottling.vintage}
-                stars={row.stars}
-                note={glassOf(row.wine).label}
+                stars={row.stars ?? undefined}
+                note={row.stars == null ? "Not opened yet" : colourInfo(row.wine.colour).label}
                 photoUrl={thumbs.data?.get(row.id) ?? null}
                 entry={{ type: "rating", id: row.id }}
               />

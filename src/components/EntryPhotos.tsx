@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PhotoCropSheet } from "@/components/PhotoCropSheet";
@@ -319,7 +320,7 @@ function FullSize({ photo, onClose }: { photo: EntryPhoto; onClose: () => void }
     };
   }, [photo.storage_path]);
 
-  return (
+  return createPortal(
     <div
       ref={dialogRef}
       role="dialog"
@@ -347,6 +348,7 @@ function FullSize({ photo, onClose }: { photo: EntryPhoto; onClose: () => void }
           <div className="h-40 w-[100px] animate-pulse bg-card" />
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -173,10 +173,10 @@ function WinePage() {
                       >
                         {memberLabel(r.profile.display_name)}
                       </Link>{" "}
-                      · {formatDate(r.drunk_on)}
+                      {r.drunk_on ? ` · ${formatDate(r.drunk_on)}` : null}
                     </p>
                     <div className="mt-1">
-                      <Stars value={r.stars} />
+                      <Stars value={r.stars ?? 0} />
                     </div>
                     {r.note ? (
                       <p className="mt-2 leading-relaxed text-foreground/90">{r.note}</p>

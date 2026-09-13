@@ -18,7 +18,7 @@ import {
   getProfile,
   getRackTotal,
   getWishlist,
-  GLASS,
+  COLOURS,
   glassOf,
   initials,
   memberLabel,
@@ -62,13 +62,17 @@ function ProfilePage() {
 
   const rows = rated.data ?? [];
   const name = memberLabel(profile.data?.display_name);
-  const average = rows.length ? rows.reduce((n, r) => n + r.stars, 0) / rows.length : 0;
-  const counts = GLASS.map((g) => ({
-    ...g,
-    count: rows.filter((r) => glassOf(r.wine).value === g.value).length,
+  // Unopened bottles have no mark yet: they count in the cellar, not in the average.
+  const tasted = rows.filter((r): r is typeof r & { stars: number } => r.stars != null);
+  const average = tasted.length ? tasted.reduce((n, r) => n + r.stars, 0) / tasted.length : 0;
+  const counts = COLOURS.map((c) => ({
+    value: c.value,
+    label: c.label,
+    hex: glassOf({ colour: c.value }).hex,
+    count: rows.filter((r) => r.wine.colour === c.value).length,
   }));
   const peak = Math.max(1, ...counts.map((c) => c.count));
-  const top = [...rows].sort((a, b) => b.stars - a.stars).slice(0, 5);
+  const top = [...tasted].sort((a, b) => b.stars - a.stars).slice(0, 5);
   const since = profile.data
     ? new Date(profile.data.joined_at).toLocaleDateString(undefined, {
         month: "long",

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { BUCKET } from "@/lib/photos";
 import { detectVarietal, normalizeVarietal } from "@/lib/varietal";
 import type { LabelCandidate } from "@/lib/label-match";
 
@@ -42,10 +43,9 @@ export function glassForStyle(colour: Colour): Glass {
   return GLASS_BY_STYLE[colour];
 }
 
-/** The wine's recorded glass colour, or the usual one for its style. */
-export function glassOf(wine: Pick<Wine, "glass" | "colour">) {
-  const value = (wine.glass as Glass | null) ?? GLASS_BY_STYLE[wine.colour];
-  return GLASS.find((g) => g.value === value) ?? GLASS[4]!;
+/** The colour bar follows the style; members pick taste, not colour (wine.glass is no longer asked). */
+export function glassOf(wine: Pick<Wine, "colour">) {
+  return GLASS.find((g) => g.value === GLASS_BY_STYLE[wine.colour]) ?? GLASS[4]!;
 }
 
 export type Wine = {
@@ -79,10 +79,12 @@ export type Profile = {
 
 export type FeedRow = {
   id: string;
-  stars: number;
+  /** Null while the bottle is in the cellar unopened. */
+  stars: number | null;
   note: string | null;
   place: string | null;
-  drunk_on: string;
+  drunk_on: string | null;
+  tasting_notes: string[];
   created_at: string;
   user_id: string;
   profile: Profile;
@@ -93,14 +95,15 @@ export type FeedRow = {
 const WINE_COLS =
   "id,lwin7,producer,cuvee,region,colour,verified,varietal,varietal_raw,vineyard,location,country,glass";
 const PROFILE_COLS = "id,display_name,avatar_url,joined_at";
-const RATING_JOIN = `id,stars,note,place,drunk_on,created_at,user_id,profile:profile!inner(${PROFILE_COLS}),bottling:bottling!inner(id,wine_id,vintage,format_ml,wine:wine!inner(${WINE_COLS}))`;
+const RATING_JOIN = `id,stars,note,place,drunk_on,tasting_notes,created_at,user_id,profile:profile!inner(${PROFILE_COLS}),bottling:bottling!inner(id,wine_id,vintage,format_ml,wine:wine!inner(${WINE_COLS}))`;
 
 type RawRating = {
   id: string;
-  stars: number;
+  stars: number | null;
   note: string | null;
   place: string | null;
-  drunk_on: string;
+  drunk_on: string | null;
+  tasting_notes: string[];
   created_at: string;
   user_id: string;
   profile: Profile;
@@ -111,10 +114,11 @@ function toFeedRow(row: RawRating): FeedRow {
   const { wine, ...bottling } = row.bottling;
   return {
     id: row.id,
-    stars: Number(row.stars),
+    stars: row.stars == null ? null : Number(row.stars),
     note: row.note,
     place: row.place,
     drunk_on: row.drunk_on,
+    tasting_notes: row.tasting_notes ?? [],
     created_at: row.created_at,
     user_id: row.user_id,
     profile: row.profile,
@@ -163,6 +167,7 @@ export async function getFeed(): Promise<FeedRow[]> {
   const { data, error } = await supabase
     .from("rating")
     .select(RATING_JOIN)
+    .not("stars", "is", null)
     .order("created_at", { ascending: false })
     .limit(100);
   if (error) throw error;
@@ -216,6 +221,7 @@ export async function getWineRatings(wineId: string): Promise<FeedRow[]> {
     .from("rating")
     .select(RATING_JOIN)
     .in("bottling_id", ids)
+    .not("stars", "is", null)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return ((data ?? []) as unknown as RawRating[]).map(toFeedRow);
@@ -261,6 +267,13 @@ export async function addToWishlist(userId: string, wineId: string) {
 }
 
 export async function removeWishlistItem(id: string) {
+  // Deleting the item cascades its photo rows, so remove the files first or they're orphaned.
+  const { data: photos } = await supabase
+    .from("entry_photos")
+    .select("storage_path,thumb_path")
+    .eq("wishlist_item_id", id);
+  const paths = (photos ?? []).flatMap((p) => [p.storage_path, p.thumb_path]);
+  if (paths.length) await supabase.storage.from(BUCKET).remove(paths);
   const { error } = await supabase.from("wishlist_item").delete().eq("id", id);
   if (error) throw error;
 }
@@ -337,11 +350,14 @@ export async function saveRating(input: {
   id?: string;
   userId: string;
   bottlingId: string;
-  stars: number;
+  /** Null for a bottle not opened yet; drunkOn is then null too. */
+  stars: number | null;
   note: string | null;
   place?: string | null;
   score100: number | null;
-  drunkOn: string;
+  drunkOn: string | null;
+  tastingNotes?: string[];
+  bottlesOwned?: number | undefined;
 }) {
   let ratingId = input.id;
   if (ratingId) {
@@ -352,6 +368,7 @@ export async function saveRating(input: {
         note: input.note,
         place: input.place ?? null,
         drunk_on: input.drunkOn,
+        tasting_notes: input.tastingNotes ?? [],
       })
       .eq("id", ratingId);
     if (error) throw error;
@@ -365,6 +382,7 @@ export async function saveRating(input: {
         note: input.note,
         place: input.place ?? null,
         drunk_on: input.drunkOn,
+        tasting_notes: input.tastingNotes ?? [],
       })
       .select("id")
       .single();
@@ -373,17 +391,25 @@ export async function saveRating(input: {
   }
 
   // Upsert rather than delete when the score is cleared: the row also holds bottles_owned.
-  const { error } = await supabase
-    .from("rating_private")
-    .upsert({ rating_id: ratingId, user_id: input.userId, score_100: input.score100 });
+  const { error } = await supabase.from("rating_private").upsert({
+    rating_id: ratingId,
+    user_id: input.userId,
+    score_100: input.score100,
+    ...(input.bottlesOwned != null ? { bottles_owned: Math.max(0, input.bottlesOwned) } : {}),
+  });
   if (error) throw error;
   return ratingId;
 }
 
-/** Quick edits from the bottle page: the member's own stars or place. */
+/** Quick edits from the bottle page: the member's own stars, date, place or tasting notes. */
 export async function updateMyRating(
   ratingId: string,
-  changes: { stars?: number; place?: string | null },
+  changes: {
+    stars?: number | null;
+    drunk_on?: string | null;
+    place?: string | null;
+    tasting_notes?: string[];
+  },
 ) {
   const { error } = await supabase.from("rating").update(changes).eq("id", ratingId);
   if (error) throw error;
@@ -404,6 +430,16 @@ export async function setBottlesOwned(ratingId: string, userId: string, count: n
     .from("rating_private")
     .upsert({ rating_id: ratingId, user_id: userId, bottles_owned: Math.max(0, count) });
   if (error) throw error;
+}
+
+/** Bottles on hand per logged bottle, for the cellar totals. Private to the member. */
+export async function getBottlesOwnedMap(userId: string) {
+  const { data, error } = await supabase
+    .from("rating_private")
+    .select("rating_id,bottles_owned")
+    .eq("user_id", userId);
+  if (error) throw error;
+  return new Map((data ?? []).map((row) => [row.rating_id, row.bottles_owned ?? 0]));
 }
 
 /** Total bottles in the member's rack, across every rated bottling. */
@@ -538,7 +574,7 @@ export function buildRanges(wines: Wine[]): Range[] {
     const varietal =
       normalizeVarietal(wine.varietal) ??
       detectVarietal(wine.varietal) ??
-      detectVarietal(wine.cuvee);
+      detectVarietal(wine.cuvee, wine.colour);
     const label = varietal ?? wine.region ?? "Other";
     const source: Range["source"] = varietal ? "varietal" : wine.region ? "region" : "other";
     const key = `${source}:${label.toLowerCase()}`;

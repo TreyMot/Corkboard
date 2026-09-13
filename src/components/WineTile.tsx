@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Stars } from "@/components/Stars";
-import { GLASS, glassOf, type Wine } from "@/lib/rim";
+import { glassOf, type Wine } from "@/lib/rim";
 
 /** The wine's display name: the cuvee, or the producer when the wine has none. */
 export function wineTitle(wine: Wine) {
@@ -228,37 +228,5 @@ export function SkeletonTiles({ count = 6 }: { count?: number }) {
         </div>
       ))}
     </TileGrid>
-  );
-}
-
-/** The key under the grid. The bar is what is in the glass, never a score. */
-export function GlassLegend() {
-  return (
-    <div
-      className="flex flex-wrap items-start justify-between border-t border-border"
-      style={{ marginTop: 44, paddingTop: 20, gap: "20px 34px" }}
-    >
-      <div>
-        <div className="caps" style={{ marginBottom: 11 }}>
-          Color in glass
-        </div>
-        <div className="flex flex-wrap" style={{ gap: "6px 16px" }}>
-          {GLASS.map((g) => (
-            <div key={g.value} className="flex items-center" style={{ gap: 7 }}>
-              <span style={{ width: 16, height: 3, background: g.hex }} />
-              <span
-                className="text-muted-foreground uppercase"
-                style={{ fontSize: 10.5, letterSpacing: "0.1em" }}
-              >
-                {g.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <p className="m-0 text-quiet" style={{ maxWidth: "40ch", fontSize: 11.5, lineHeight: 1.7 }}>
-        The color bar records what is in the glass. It never stands for a score.
-      </p>
-    </div>
   );
 }

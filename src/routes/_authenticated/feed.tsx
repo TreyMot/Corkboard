@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { AppShell, ErrorNote, ScreenHeading } from "@/components/AppShell";
-import { GlassLegend, SkeletonTiles, TileGrid, WineTile } from "@/components/WineTile";
+import { SkeletonTiles, TileGrid, WineTile } from "@/components/WineTile";
 import {
   COLOURS,
+  colourInfo,
+  getBottlesOwnedMap,
   getFeed,
   getMemberRatings,
   getWishlist,
@@ -39,8 +41,8 @@ type Item = {
   id: string;
   wine: Wine;
   vintage: number | null | undefined;
-  /** The viewer's own mark. */
-  stars: number;
+  /** The viewer's own mark; null for a bottle in the cellar not opened yet. */
+  stars: number | null;
   createdAt: string;
   place: string | null;
   pouredBy: string | null;
@@ -50,7 +52,7 @@ const TABS = [
   {
     label: "Cellar",
     headline: "What you have been drinking",
-    sub: "Every bottle you have poured and scored. Open one to adjust the rating, add a photograph, or write the note you will want next year.",
+    sub: "Every bottle you have logged, opened or waiting. Open one to rate it, add a photograph, count what is left, or write the note you will want next year.",
   },
   {
     label: "Wishlist",
@@ -102,7 +104,7 @@ function HomePage() {
 
   const lists = useMemo(() => {
     const myStars = new Map((mine.data ?? []).map((r) => [r.bottling.id, r.stars]));
-    const fromRating = (r: FeedRow, stars: number): Item => ({
+    const fromRating = (r: FeedRow, stars: number | null): Item => ({
       key: `rating:${r.id}`,
       type: "rating",
       id: r.id,
@@ -155,14 +157,15 @@ function HomePage() {
       .includes(term);
   });
   if (sort === 0) shown.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  if (sort === 1) shown.sort((a, b) => b.stars - a.stars);
+  if (sort === 1) shown.sort((a, b) => (b.stars ?? -1) - (a.stars ?? -1));
   if (sort === 2) shown.sort((a, b) => (a.vintage ?? 99999) - (b.vintage ?? 99999));
 
   const thumbFor = (i: Item) =>
     (i.type === "rating" ? ratingThumbs.data?.get(i.id) : wishThumbs.data?.get(i.id)) ?? null;
   const noteFor = (i: Item) => {
     if (tab === 2 && i.pouredBy) return `Poured by ${i.pouredBy}`;
-    if (i.stars > 0) return glassOf(i.wine).label;
+    if (i.stars != null && i.stars > 0) return colourInfo(i.wine.colour).label;
+    if (i.stars == null && i.pouredBy === "you") return "Not opened yet";
     return i.type === "wishlist" || wishWines.has(i.wine.id) ? "Wishlist" : "Not yet rated";
   };
 
@@ -360,7 +363,7 @@ function HomePage() {
               key={i.key}
               wine={i.wine}
               vintage={i.vintage}
-              stars={i.stars}
+              stars={i.stars ?? undefined}
               note={noteFor(i)}
               photoUrl={thumbFor(i)}
               wish={i.type === "wishlist" || wishWines.has(i.wine.id)}
@@ -370,7 +373,9 @@ function HomePage() {
         </TileGrid>
       ) : null}
 
-      <GlassLegend />
+      {tab === 0 && !term && (mine.data ?? []).length ? (
+        <CellarTotals rows={mine.data ?? []} userId={user.id} />
+      ) : null}
     </AppShell>
   );
 }
@@ -401,5 +406,139 @@ function EmptyTab({ tab }: { tab: number }) {
         </Link>
       ) : null}
     </div>
+  );
+}
+
+type Tally = { label: string; wines: number; bottles: number; hex?: string };
+
+function tally(rows: FeedRow[], owned: Map<string, number>, keyOf: (r: FeedRow) => string) {
+  const out = new Map<string, Tally>();
+  for (const r of rows) {
+    const label = keyOf(r);
+    const t = out.get(label) ?? { label, wines: 0, bottles: 0 };
+    t.wines += 1;
+    t.bottles += owned.get(r.id) ?? 0;
+    out.set(label, t);
+  }
+  return [...out.values()];
+}
+
+/** Wines logged and bottles on hand, by style and by grape. Counts are the member's own. */
+function CellarTotals({ rows, userId }: { rows: FeedRow[]; userId: string }) {
+  const owned = useQuery({
+    queryKey: ["bottles-owned-map", userId],
+    queryFn: () => getBottlesOwnedMap(userId),
+  });
+  const map = owned.data ?? new Map<string, number>();
+  const byStyle = COLOURS.flatMap((c) => {
+    const t = tally(
+      rows.filter((r) => r.wine.colour === c.value),
+      map,
+      () => c.label,
+    )[0];
+    return t ? [{ ...t, hex: glassOf({ colour: c.value }).hex }] : [];
+  });
+  const byGrape = tally(rows, map, (r) => r.wine.varietal ?? "No grape listed").sort(
+    (a, b) => b.wines - a.wines || a.label.localeCompare(b.label),
+  );
+  const total = { wines: rows.length, bottles: rows.reduce((n, r) => n + (map.get(r.id) ?? 0), 0) };
+
+  return (
+    <section
+      aria-labelledby="totals-title"
+      className="border-t border-border"
+      style={{ marginTop: 44, paddingTop: 22 }}
+    >
+      <div className="flex flex-wrap items-baseline justify-between" style={{ gap: 12 }}>
+        <h2 id="totals-title" className="caps m-0" style={{ fontWeight: 400 }}>
+          Cellar totals
+        </h2>
+        <p className="m-0 font-display text-foreground" style={{ fontSize: 20 }}>
+          {plural(total.wines, "wine")}
+          <span className="text-muted-foreground">, </span>
+          {plural(total.bottles, "bottle")} on hand
+        </p>
+      </div>
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))",
+          gap: "26px 40px",
+          marginTop: 18,
+        }}
+      >
+        <TotalsTable caption="By style" rows={byStyle} total={total} />
+        <TotalsTable caption="By grape" rows={byGrape} total={total} />
+      </div>
+      <p className="m-0 text-quiet" style={{ fontSize: 11.5, lineHeight: 1.7, marginTop: 16 }}>
+        Wines are the bottles you have logged; bottles on hand come from the count on each bottle
+        page. Only you see these totals.
+      </p>
+    </section>
+  );
+}
+
+function plural(n: number, word: string) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+function TotalsTable({
+  caption,
+  rows,
+  total,
+}: {
+  caption: string;
+  rows: Tally[];
+  total: { wines: number; bottles: number };
+}) {
+  const cell = { padding: "8px 0", borderBottom: "1px solid var(--color-border)" };
+  const num = { ...cell, textAlign: "right" as const, width: 72 };
+  return (
+    <table className="w-full tabular-nums" style={{ borderCollapse: "collapse", fontSize: 13 }}>
+      <caption className="caps text-left text-eyebrow" style={{ fontSize: 10, paddingBottom: 8 }}>
+        {caption}
+      </caption>
+      <thead>
+        <tr className="text-quiet" style={{ fontSize: 10.5, letterSpacing: "0.08em" }}>
+          <th scope="col" className="text-left uppercase" style={{ ...cell, fontWeight: 400 }}>
+            {caption === "By style" ? "Style" : "Grape"}
+          </th>
+          <th scope="col" className="uppercase" style={{ ...num, fontWeight: 400 }}>
+            Wines
+          </th>
+          <th scope="col" className="uppercase" style={{ ...num, fontWeight: 400 }}>
+            Bottles
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.label} className="text-foreground">
+            <th scope="row" className="text-left" style={{ ...cell, fontWeight: 400 }}>
+              <span className="inline-flex items-center" style={{ gap: 8 }}>
+                {r.hex ? (
+                  <span aria-hidden style={{ width: 14, height: 3, background: r.hex }} />
+                ) : null}
+                {r.label}
+              </span>
+            </th>
+            <td style={num}>{r.wines}</td>
+            <td style={num}>{r.bottles}</td>
+          </tr>
+        ))}
+      </tbody>
+      <tfoot>
+        <tr
+          className="font-display text-foreground"
+          style={{ fontSize: 16, fontVariantNumeric: "lining-nums tabular-nums" }}
+        >
+          <th scope="row" className="text-left" style={{ padding: "9px 0", fontWeight: 500 }}>
+            Total
+          </th>
+          <td style={{ padding: "9px 0", textAlign: "right" }}>{total.wines}</td>
+          <td style={{ padding: "9px 0", textAlign: "right" }}>{total.bottles}</td>
+        </tr>
+      </tfoot>
+    </table>
   );
 }

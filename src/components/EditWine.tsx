@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { InlineError } from "@/components/WineBits";
-import { COLOURS, GLASS, glassOf, updateWine, type Colour, type Glass, type Wine } from "@/lib/rim";
-import { VARIETALS, normalizeVarietal } from "@/lib/varietal";
+import { COLOURS, glassForStyle, updateWine, type Colour, type Wine } from "@/lib/rim";
+import { VARIETAL_GROUPS, detectVarietal, normalizeVarietal } from "@/lib/varietal";
 
-export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
+export function FieldLabel({
+  htmlFor,
+  id,
+  children,
+}: {
+  htmlFor?: string;
+  id?: string;
+  children: React.ReactNode;
+}) {
   return (
     <label
       htmlFor={htmlFor}
+      id={id}
       className="caps block"
       style={{ letterSpacing: "0.18em", marginBottom: 7 }}
     >
@@ -16,82 +25,64 @@ export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: 
   );
 }
 
-/** Style chips (red, white...) and colour-in-glass chips, shared by edit and log. */
-export function StyleAndGlass({
+/** Style chips (red, white...), shared by edit and log. The colour bar follows the style. */
+export function StylePicker({
   colour,
-  glass,
   onColour,
-  onGlass,
 }: {
   colour: Colour;
-  glass: Glass;
   onColour: (c: Colour) => void;
-  onGlass: (g: Glass) => void;
 }) {
   return (
-    <>
-      <div>
-        <FieldLabel>Style</FieldLabel>
-        <div className="flex flex-wrap" style={{ gap: 8 }}>
-          {COLOURS.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              className="chip"
-              style={{ minHeight: 44 }}
-              data-on={colour === c.value}
-              aria-pressed={colour === c.value}
-              onClick={() => onColour(c.value)}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
+    <div>
+      <FieldLabel>Style</FieldLabel>
+      <div className="flex flex-wrap" style={{ gap: 8 }}>
+        {COLOURS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            className="chip"
+            style={{ minHeight: 44 }}
+            data-on={colour === c.value}
+            aria-pressed={colour === c.value}
+            onClick={() => onColour(c.value)}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
-      <div>
-        <FieldLabel>Color in glass</FieldLabel>
-        <div className="flex flex-wrap" style={{ gap: 8 }}>
-          {GLASS.map((g) => (
-            <button
-              key={g.value}
-              type="button"
-              className="chip"
-              style={{ minHeight: 44 }}
-              data-on={glass === g.value}
-              aria-pressed={glass === g.value}
-              onClick={() => onGlass(g.value)}
-            >
-              <span aria-hidden style={{ width: 16, height: 3, background: g.hex }} />
-              {g.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 
 export function VarietalSelect({
   id,
   value,
+  style,
   onChange,
 }: {
   id: string;
   value: string;
+  /** The wine's style, so a bare "blend" reads as red or white. */
+  style?: Colour;
   onChange: (v: string) => void;
 }) {
   return (
     <select
       id={id}
-      value={normalizeVarietal(value) ?? ""}
+      value={normalizeVarietal(value) ?? detectVarietal(value, style) ?? ""}
       onChange={(e) => onChange(e.target.value)}
       className="field"
     >
       <option value="">None, it's a place, not a grape</option>
-      {VARIETALS.map((v) => (
-        <option key={v} value={v}>
-          {v}
-        </option>
+      {VARIETAL_GROUPS.map((group) => (
+        <optgroup key={group.label} label={group.label}>
+          {group.options.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </optgroup>
       ))}
     </select>
   );
@@ -118,7 +109,6 @@ export function EditWine({
     varietal: wine.varietal ?? "",
   });
   const [colour, setColour] = useState<Colour>(wine.colour);
-  const [glass, setGlass] = useState<Glass>(glassOf(wine).value);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const text = (key: keyof typeof f, label: string, placeholder: string, wide = false) => (
@@ -155,7 +145,7 @@ export function EditWine({
             country: orNull(f.country),
             varietal: orNull(f.varietal),
             colour,
-            glass,
+            glass: glassForStyle(colour),
           });
           await queryClient.invalidateQueries();
           onDone();
@@ -187,11 +177,12 @@ export function EditWine({
           <VarietalSelect
             id="edit-varietal"
             value={f.varietal}
+            style={colour}
             onChange={(v) => setF({ ...f, varietal: v })}
           />
         </div>
       </div>
-      <StyleAndGlass colour={colour} glass={glass} onColour={setColour} onGlass={setGlass} />
+      <StylePicker colour={colour} onColour={setColour} />
       {error ? <InlineError>{error}</InlineError> : null}
       <div className="flex flex-wrap" style={{ gap: 12 }}>
         <button

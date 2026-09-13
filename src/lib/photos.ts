@@ -101,7 +101,8 @@ async function encode(canvas: HTMLCanvasElement, quality: number): Promise<Encod
   const webp = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, "image/webp", quality),
   );
-  if (webp)
+  // Safari can't encode WebP and quietly hands back a full-size PNG instead; check what came out.
+  if (webp?.type === "image/webp")
     return {
       blob: webp,
       ext: "webp",
@@ -321,6 +322,20 @@ export async function setPrimary(type: EntryType, entryId: string, photoId: stri
 export async function setKind(photoId: string, kind: PhotoKind) {
   const { error } = await supabase.from("entry_photos").update({ kind }).eq("id", photoId);
   if (error) throw error;
+}
+
+/**
+ * Logging a wishlist bottle turns it into a cellar entry: carry its photos across before the
+ * wishlist item is deleted (its photo rows cascade with it). Returns how many moved.
+ */
+export async function moveWishlistPhotos(wishlistItemId: string, ratingId: string) {
+  const { data, error } = await supabase
+    .from("entry_photos")
+    .update({ rating_id: ratingId, wishlist_item_id: null })
+    .eq("wishlist_item_id", wishlistItemId)
+    .select("id");
+  if (error) throw error;
+  return data?.length ?? 0;
 }
 
 /** Soft delete. If the photo was primary, the next remaining photo takes over. */

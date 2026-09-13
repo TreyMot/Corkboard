@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useModal } from "@/components/useModal";
 import { InlineError } from "@/components/WineBits";
 import { PHOTO_KINDS, type CropRect, type PhotoKind } from "@/lib/photos";
@@ -96,7 +97,7 @@ export function PhotoCropSheet({ bitmap, onCancel, onRetake, onConfirm }: Props)
     onConfirm(crop, kind);
   }
 
-  return (
+  return createPortal(
     <div
       ref={dialogRef}
       role="dialog"
@@ -207,6 +208,7 @@ export function PhotoCropSheet({ bitmap, onCancel, onRetake, onConfirm }: Props)
           Use this photo
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
