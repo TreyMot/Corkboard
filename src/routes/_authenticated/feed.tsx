@@ -86,6 +86,10 @@ function HomePage() {
     queryFn: () => getWishlist(user.id),
   });
   const feed = useQuery({ queryKey: ["feed"], queryFn: getFeed });
+  const owned = useQuery({
+    queryKey: ["bottles-owned-map", user.id],
+    queryFn: () => getBottlesOwnedMap(user.id),
+  });
 
   const ratingIds = [
     ...new Set([...(mine.data ?? []), ...(feed.data ?? [])].map((r) => r.id)),
@@ -368,6 +372,7 @@ function HomePage() {
               photoUrl={thumbFor(i)}
               wish={i.type === "wishlist" || wishWines.has(i.wine.id)}
               entry={{ type: i.type, id: i.id }}
+              bottles={i.type === "rating" ? owned.data?.get(i.id) : undefined}
             />
           ))}
         </TileGrid>
@@ -438,9 +443,11 @@ function CellarTotals({ rows, userId }: { rows: FeedRow[]; userId: string }) {
     )[0];
     return t ? [{ ...t, hex: glassOf({ colour: c.value }).hex }] : [];
   });
-  const byGrape = tally(rows, map, (r) => r.wine.varietal ?? "No grape listed").sort(
-    (a, b) => b.wines - a.wines || a.label.localeCompare(b.label),
-  );
+  const byGrape = tally(
+    rows,
+    map,
+    (r) => r.wine.varietal ?? r.wine.varietal_raw ?? "No grape listed",
+  ).sort((a, b) => b.wines - a.wines || a.label.localeCompare(b.label));
   const total = { wines: rows.length, bottles: rows.reduce((n, r) => n + (map.get(r.id) ?? 0), 0) };
 
   return (

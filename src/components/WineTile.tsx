@@ -132,9 +132,20 @@ export type WineTileProps = {
   wish?: boolean;
   /** Link to one member's entry rather than the wine. */
   entry?: { type: "rating" | "wishlist"; id: string };
+  /** The viewer's own bottles on hand, shown after the vintage as "(3)". Private. */
+  bottles?: number | undefined;
 };
 
-export function WineTile({ wine, vintage, stars, note, photoUrl, wish, entry }: WineTileProps) {
+export function WineTile({
+  wine,
+  vintage,
+  stars,
+  note,
+  photoUrl,
+  wish,
+  entry,
+  bottles,
+}: WineTileProps) {
   const inner = (
     <>
       <TileFrame wine={wine} vintage={vintage} photoUrl={photoUrl} wish={wish} interactive />
@@ -159,6 +170,14 @@ export function WineTile({ wine, vintage, stars, note, photoUrl, wish, entry }: 
               <span className="text-[11px] text-muted-foreground tabular-nums">
                 {vintageText(vintage)}
               </span>
+              {bottles ? (
+                <span className="text-[11px] text-muted-foreground tabular-nums">
+                  <span aria-hidden>({bottles})</span>
+                  <span className="sr-only">
+                    {bottles === 1 ? "1 bottle" : `${bottles} bottles`} on hand
+                  </span>
+                </span>
+              ) : null}
               {stars !== undefined ? (
                 <span
                   aria-hidden

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { InlineError } from "@/components/WineBits";
 import { COLOURS, glassForStyle, updateWine, type Colour, type Wine } from "@/lib/rim";
-import { VARIETAL_GROUPS, detectVarietal, normalizeVarietal } from "@/lib/varietal";
+import { VARIETAL_GROUPS, detectVarietal, normalizeVarietal, varietalFields } from "@/lib/varietal";
 
 export function FieldLabel({
   htmlFor,
@@ -67,26 +67,50 @@ export function VarietalSelect({
   style?: Colour;
   onChange: (v: string) => void;
 }) {
+  const known = normalizeVarietal(value) ?? detectVarietal(value, style);
+  // A grape outside the list is typed; the select stays on Other while the member types.
+  const [other, setOther] = useState(!!value.trim() && !known);
   return (
-    <select
-      id={id}
-      value={normalizeVarietal(value) ?? detectVarietal(value, style) ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-      className="field"
-    >
-      <option value="">None, it's a place, not a grape</option>
-      {VARIETAL_GROUPS.map((group) => (
-        <optgroup key={group.label} label={group.label}>
-          {group.options.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
+    <>
+      <select
+        id={id}
+        value={other ? OTHER : (known ?? "")}
+        onChange={(e) => {
+          const v = e.target.value;
+          setOther(v === OTHER);
+          onChange(v === OTHER ? "" : v);
+        }}
+        className="field"
+      >
+        <option value="">None, it's a place, not a grape</option>
+        {VARIETAL_GROUPS.map((group) => (
+          <optgroup key={group.label} label={group.label}>
+            {group.options.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+        <option value={OTHER}>Other, I'll type it</option>
+      </select>
+      {other ? (
+        <input
+          className="field"
+          style={{ marginTop: 10 }}
+          value={value}
+          maxLength={80}
+          placeholder="Grenache Blanc"
+          aria-label="Varietal, typed"
+          autoFocus
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : null}
+    </>
   );
 }
+
+const OTHER = "__other";
 
 /** Corrections apply everywhere the wine appears, and are logged to wine_edit_log. */
 export function EditWine({
@@ -106,7 +130,7 @@ export function EditWine({
     region: wine.region ?? "",
     location: wine.location ?? "",
     country: wine.country ?? "",
-    varietal: wine.varietal ?? "",
+    varietal: wine.varietal_raw ?? wine.varietal ?? "",
   });
   const [colour, setColour] = useState<Colour>(wine.colour);
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +167,7 @@ export function EditWine({
             region: orNull(f.region),
             location: orNull(f.location),
             country: orNull(f.country),
-            varietal: orNull(f.varietal),
+            ...varietalFields(f.varietal, colour),
             colour,
             glass: glassForStyle(colour),
           });

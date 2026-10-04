@@ -8,7 +8,8 @@ type Props = {
   bitmap: ImageBitmap;
   fileName: string;
   onCancel: () => void;
-  onRetake: () => void;
+  /** Omitted where retaking makes no sense (the label shot already read). */
+  onRetake?: () => void;
   onConfirm: (crop: CropRect, kind: PhotoKind) => void;
 };
 
@@ -113,12 +114,16 @@ export function PhotoCropSheet({ bitmap, onCancel, onRetake, onConfirm }: Props)
           Cancel
         </button>
         <p className="eyebrow">Position the bottle</p>
-        <button
-          onClick={onRetake}
-          className="tap text-sm text-muted-foreground underline underline-offset-4"
-        >
-          Retake
-        </button>
+        {onRetake ? (
+          <button
+            onClick={onRetake}
+            className="tap text-sm text-muted-foreground underline underline-offset-4"
+          >
+            Retake
+          </button>
+        ) : (
+          <span aria-hidden style={{ width: 52 }} />
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">

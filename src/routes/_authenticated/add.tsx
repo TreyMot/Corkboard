@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { AppShell, BackToGrid } from "@/components/AppShell";
 import { FieldLabel as Label, StylePicker, VarietalSelect } from "@/components/EditWine";
+import { PhotoCropSheet } from "@/components/PhotoCropSheet";
 import { StarPicker } from "@/components/Stars";
 import { ColourMark, InlineError, SkeletonRows, WineName } from "@/components/WineBits";
 import { wineTitle } from "@/components/WineTile";
@@ -16,6 +17,8 @@ import {
   labelImageBase64,
   moveWishlistPhotos,
   uploadPhoto,
+  type CropRect,
+  type PhotoKind,
 } from "@/lib/photos";
 import { TastingNotes } from "@/components/TastingNotes";
 import {
@@ -41,7 +44,7 @@ import {
   type Colour,
   type Wine,
 } from "@/lib/rim";
-import { detectVarietal, normalizeVarietal } from "@/lib/varietal";
+import { detectVarietal, varietalFields } from "@/lib/varietal";
 
 export const Route = createFileRoute("/_authenticated/add")({
   head: () => ({
@@ -121,6 +124,9 @@ function AddPage() {
   const [labelBusy, setLabelBusy] = useState(false);
   const [labelNote, setLabelNote] = useState<string | null>(null);
   const [labelShot, setLabelShot] = useState<ImageBitmap | null>(null);
+  // How the saved copy of the label shot is framed; centred until the member reframes it.
+  const [labelCrop, setLabelCrop] = useState<{ crop: CropRect; kind: PhotoKind } | null>(null);
+  const [framing, setFraming] = useState(false);
   const [readVintage, setReadVintage] = useState<number | null>(null);
   // Set when the form was filled from an LWIN record; kept only if producer and name stay as read.
   const [lwinPick, setLwinPick] = useState<{
@@ -207,6 +213,7 @@ function AddPage() {
     try {
       const bitmap = await decodeFile(file);
       setLabelShot(bitmap);
+      setLabelCrop(null);
       const result = await readLabelFn({ data: { image: await labelImageBase64(bitmap) } });
       if (!result.ok) {
         setLabelNote(result.error);
@@ -298,8 +305,8 @@ function AddPage() {
         entryId,
         ownerId: user.id,
         bitmap: labelShot,
-        crop: centreCrop(labelShot),
-        kind: "front",
+        crop: labelCrop?.crop ?? centreCrop(labelShot),
+        kind: labelCrop?.kind ?? "front",
         makePrimary,
       });
     } catch {
@@ -442,10 +449,8 @@ function AddPage() {
   }
 
   function createManualWine() {
-    const normalized =
-      normalizeVarietal(mVarietal) ??
-      detectVarietal(mVarietal, colour) ??
-      detectVarietal(mCuvee, colour);
+    const typed = varietalFields(mVarietal, colour);
+    const normalized = typed.varietal ?? detectVarietal(mCuvee, colour);
     // Filled from LWIN and the identity left as matched: adopt the verified record.
     if (lwinPick && mProducer.trim() === lwinPick.producer && mCuvee.trim() === lwinPick.cuvee) {
       return adoptLwinWine({
@@ -464,7 +469,7 @@ function AddPage() {
       colour,
       glass: glassForStyle(colour),
       varietal: normalized,
-      varietal_raw: mVarietal.trim() && mVarietal.trim() !== normalized ? mVarietal.trim() : null,
+      varietal_raw: typed.varietal_raw,
       vineyard: mVineyard.trim() || null,
       location: mLocation.trim() || null,
       country: mCountry.trim() || null,
@@ -556,6 +561,26 @@ function AddPage() {
               {labelNote}
             </p>
           ) : null}
+          {labelShot && (manual || wine) ? (
+            <button
+              type="button"
+              onClick={() => setFraming(true)}
+              className="tap mb-4 text-sm text-muted-foreground underline underline-offset-4"
+            >
+              {labelCrop ? "Reframe the photo to save" : "Zoom or reframe the photo to save"}
+            </button>
+          ) : null}
+          {framing && labelShot ? (
+            <PhotoCropSheet
+              bitmap={labelShot}
+              fileName=""
+              onCancel={() => setFraming(false)}
+              onConfirm={(crop, kind) => {
+                setLabelCrop({ crop, kind });
+                setFraming(false);
+              }}
+            />
+          ) : null}
 
           {manual ? (
             <ManualForm
@@ -616,7 +641,6 @@ function AddPage() {
                   <input
                     type="file"
                     accept="image/*,.heic,.heif"
-                    capture="environment"
                     className="sr-only"
                     disabled={labelBusy}
                     onChange={(e) => {
@@ -631,7 +655,7 @@ function AddPage() {
                   style={{ fontSize: 11, lineHeight: 1.6, maxWidth: "36ch" }}
                 >
                   {labelNote ??
-                    "Anthropic's Claude AI reads the photo and fills in the producer, name and vintage for you to check. Or type below."}
+                    "Take a photo or pick one from your library. Anthropic's Claude AI reads it and fills in the producer, name and vintage for you to check. Or type below."}
                 </span>
               </div>
               <Label htmlFor="brand">Brand</Label>

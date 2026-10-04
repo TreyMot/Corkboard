@@ -223,7 +223,6 @@ export function EntryPhotos({
             ref={inputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-            capture="environment"
             className="sr-only"
             tabIndex={-1}
             aria-hidden="true"

@@ -1,6 +1,7 @@
-// Controlled varietal vocabulary. Members never type a varietal; anything that
-// arrives from a label, an import or a hand-typed cuvée is squeezed through
-// here so "Cab Sauv", "Cabernet" and "Cabernet Sauvignon" become one row.
+// Controlled varietal vocabulary. Anything that arrives from a label, an import,
+// a hand-typed cuvée or a member's own "Other" grape is squeezed through here so
+// "Cab Sauv", "Cabernet" and "Cabernet Sauvignon" become one row. The words as
+// written are kept in varietal_raw for display.
 
 export const VARIETALS = [
   "Cabernet Sauvignon",
@@ -199,4 +200,12 @@ export function detectVarietal(
     return white ? "White Blend" : "Red Blend";
   }
   return grapes[0] ?? (found.has("Rosé") ? "Rosé" : null);
+}
+
+/** The two stored columns for whatever the member picked or typed: the controlled value for
+ * sorting and totals (null when unknown), and the words as written when they differ. */
+export function varietalFields(text: string, style?: string | null) {
+  const raw = text.trim();
+  const varietal = normalizeVarietal(raw) ?? detectVarietal(raw, style);
+  return { varietal, varietal_raw: raw && raw !== varietal ? raw : null };
 }

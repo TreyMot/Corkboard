@@ -415,6 +415,16 @@ export async function updateMyRating(
   if (error) throw error;
 }
 
+/** Move the member's rating to another vintage of the same wine and size. */
+export async function changeVintage(ratingId: string, bottling: Bottling, vintage: number | null) {
+  const next = await ensureBottling(bottling.wine_id, vintage, bottling.format_ml);
+  const { error } = await supabase
+    .from("rating")
+    .update({ bottling_id: next.id })
+    .eq("id", ratingId);
+  if (error) throw error;
+}
+
 export async function getBottlesOwned(ratingId: string) {
   const { data, error } = await supabase
     .from("rating_private")
@@ -479,6 +489,7 @@ export type WineChanges = {
   location: string | null;
   country: string | null;
   varietal: string | null;
+  varietal_raw: string | null;
   glass: Glass | null;
 };
 

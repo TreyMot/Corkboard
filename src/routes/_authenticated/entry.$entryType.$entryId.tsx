@@ -10,6 +10,7 @@ import { IdentityNote, SkeletonRows } from "@/components/WineBits";
 import { TileFrame, vintageText, wineTitle } from "@/components/WineTile";
 import {
   addToWishlist,
+  changeVintage,
   colourInfo,
   formatDate,
   formatFormat,
@@ -49,6 +50,15 @@ export const Route = createFileRoute("/_authenticated/entry/$entryType/$entryId"
 });
 
 const RULE = "rgba(233,222,200,.14)";
+
+/** This year back to 1950, plus the bottle's own year if it is older. */
+function vintageYears(current: number | null) {
+  const years = Array.from(
+    { length: new Date().getFullYear() - 1949 },
+    (_, i) => new Date().getFullYear() - i,
+  );
+  return current != null && !years.includes(current) ? [...years, current] : years;
+}
 
 function EntryPage() {
   const { entryType, entryId } = Route.useParams();
@@ -148,6 +158,20 @@ function EntryPage() {
     }
   }
 
+  async function saveVintage(value: string) {
+    if (!rating) return;
+    try {
+      await changeVintage(entryId, rating.bottling, value === "nv" ? null : Number(value));
+      await refresh();
+    } catch (error) {
+      toast(
+        (error as { code?: string }).code === "23505"
+          ? "You've already logged that vintage. Edit that bottle instead."
+          : "That didn't go through. Try again?",
+      );
+    }
+  }
+
   async function changeOwned(delta: number) {
     // Read the cache, not the render closure, so quick repeat taps each count.
     const next = Math.max(
@@ -182,7 +206,7 @@ function EntryPage() {
     }
   }
 
-  const facts: { label: string; value: string; swatch?: string }[] = [
+  const facts: { label: string; value: string; swatch?: string; control?: React.ReactNode }[] = [
     { label: "Vineyard", value: wine.vineyard ?? "Not recorded" },
     { label: "Location", value: wine.location ?? "Not recorded" },
     {
@@ -191,6 +215,25 @@ function EntryPage() {
         vintage === undefined
           ? "Any"
           : `${vintageText(vintage)}${rating && rating.bottling.format_ml !== 750 ? `, ${formatFormat(rating.bottling.format_ml)}` : ""}`,
+      ...(rating && mine
+        ? {
+            control: (
+              <select
+                aria-label="Vintage"
+                value={vintage == null ? "nv" : String(vintage)}
+                onChange={(e) => void saveVintage(e.target.value)}
+                className="tap rounded-[2px] border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+              >
+                {vintageYears(vintage ?? null).map((y) => (
+                  <option key={y} value={String(y)}>
+                    {y}
+                  </option>
+                ))}
+                <option value="nv">NV</option>
+              </select>
+            ),
+          }
+        : {}),
     },
     { label: "Varietal", value: wine.varietal_raw ?? wine.varietal ?? "Not recorded" },
     { label: "Style", value: colourInfo(wine.colour).label },
@@ -278,7 +321,10 @@ function EntryPage() {
                       style={{ width: 18, height: 3, flex: "0 0 auto", background: f.swatch }}
                     />
                   ) : null}
-                  <span>{f.value}</span>
+                  {f.control ?? <span>{f.value}</span>}
+                  {f.control && rating && rating.bottling.format_ml !== 750 ? (
+                    <span>{formatFormat(rating.bottling.format_ml)}</span>
+                  ) : null}
                 </div>
               </div>
             ))}
